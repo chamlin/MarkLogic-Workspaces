@@ -1,0 +1,44 @@
+<export><workspace name="tokens-stems"><query name="tokens-staems" focus="false" listorder="1" taborder="1" active="true" database="8067410864933823471" server="17385002289968607215" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+
+declare function local:show-codepoints ($label as xs:string, $s as xs:string) {
+let $cp := fn:string-join ((fn:string-to-codepoints ($s) ! xdmp:integer-to-hex (.)), '.')
+return
+   fn:string-join (($label, ': ', $cp, ' &lt;= ', xdmp:describe ($s)), '')
+};
+
+declare function local:tokens-stems ($s as xs:string, $l as xs:string) {
+    "'"||$s||"'",
+    let $tokens := cts:tokenize ($s, $l)
+    for $token at $i in $tokens 
+    return (
+        local:show-codepoints ('token '||$token, $token),
+        for $stem in cts:stem ($token, $l)
+        return
+            local:show-codepoints ('stem '||$stem, $stem)
+        ,
+        ''
+    )
+};
+
+local:tokens-stems ('xyz', 'en')
+
+</query><query name="get baseline" focus="false" listorder="3" taborder="3" active="true" database="10568417523734248751" server="12900249726103733002" database-name="" server-name="" mode="xquery" optimize="">  xquery version "1.0-ml";
+
+  import module namespace admin = "http://marklogic.com/xdmp/admin"
+      at "/MarkLogic/admin.xqy";
+
+  let $cfg := admin:get-configuration()
+
+  return admin:cluster-get-language-baseline($cfg)</query><query name="set baseline" focus="false" listorder="4" taborder="4" active="true" database="10568417523734248751" server="4701844950794984458" database-name="" server-name="" mode="xquery" optimize="">  xquery version "1.0-ml";
+
+  import module namespace admin = "http://marklogic.com/xdmp/admin"
+      at "/MarkLogic/admin.xqy";
+
+  let $cfg := admin:get-configuration()
+
+  return admin:save-configuration (admin:cluster-set-language-baseline($cfg, "ml9"))</query><query name="cts:hash-terms" focus="true" listorder="4" taborder="4" active="true" database="8067410864933823471" server="17385002289968607215" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+
+let $options := &lt;options xmlns="cts:train"&gt;&lt;use-db-config&gt;true&lt;/use-db-config&gt;&lt;details&gt;true&lt;/details&gt;&lt;/options&gt;
+let $doc := (cts:search(doc(), cts:term-query($key)))[1]
+return
+    cts:hash-terms($doc, $options)//cts:term[@id = $key]</query></workspace></export>
