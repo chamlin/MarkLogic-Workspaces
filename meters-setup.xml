@@ -1,0 +1,104 @@
+<export><workspace name="meters-setup"><query name="set group settings" focus="false" listorder="2" taborder="3" active="true" database="2845277722470201063" server="6743820675239763446" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+(: set dbname to the db that you are using for the meters data, better a separate db for each case 
+This will set the group (usually Default) settings so that meters data won't be collected or deleted
+:)
+import module namespace admin = "http://marklogic.com/xdmp/admin"
+		  at "/MarkLogic/admin.xqy";
+      
+(: set db name for the db you are using for meters, and group if not Default :)
+(: this script sets retain for a long :)
+declare variable  $db-name := 'mymetersdb';
+declare variable $group-name := 'Default';
+
+let $config := admin:get-configuration()
+let $groupid := admin:group-get-id($config, $group-name)
+let $config := admin:group-set-performance-metering-retain-raw($config, $groupid, 900)
+let $config := admin:group-set-performance-metering-retain-hourly($config, $groupid, 900)
+let $config := admin:group-set-performance-metering-retain-daily($config, $groupid, 900)
+let $config := admin:group-set-performance-metering-enabled($config, $groupid, fn:false())
+let $config := admin:group-set-metering-enabled($config, $groupid, fn:false())
+let $config := admin:group-set-meters-database($config, $groupid, xdmp:database($db-name))
+
+return admin:save-configuration ($config)
+</query><query name="add db indexes" focus="false" listorder="3" taborder="2" active="true" database="2845277722470201063" server="6743820675239763446" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+(: set db name for the db you are using for meters data
+this script will add the indexes needed for the data(base) to be used for monitoring history
+:)
+
+import module namespace admin = "http://marklogic.com/xdmp/admin" at "/MarkLogic/admin.xqy";
+
+declare variable  $db-name := 'mymetersdb';
+
+ 
+let $db-id := xdmp:database($db-name)
+let $config := admin:get-configuration()
+ 
+let $element-indexes := (
+    ("cluster-id","group-id","host-id","database-id","forest-id","server-id")
+    !
+    admin:database-range-element-index ("unsignedLong", "http://marklogic.com/manage/meters", ., (), fn:true())
+    ,
+    ("start-time","end-time","period-start-time")
+    !
+    admin:database-range-element-index ("dateTime", "http://marklogic.com/manage/meters", ., (), fn:true())
+    ,
+    ("period")
+    !
+    admin:database-range-element-index ("string", "http://marklogic.com/manage/meters", ., "http://marklogic.com/collation/", fn:true())
+    ,
+    ("start_dt","end_dt")
+    !
+    admin:database-range-element-index ("dateTime", "http://marklogic.com/manage/meters/label", ., (), fn:true())
+    ,
+    ("name")
+    !
+    admin:database-range-element-index ("string", "http://marklogic.com/manage/meters", ., "http://marklogic.com/collation/", fn:true())
+)
+let $element-attribute-indexes := (
+        admin:database-range-element-attribute-index ("unsignedLong", "http://marklogic.com/manage/meters/label", 'label', (), 'id', (), fn:false())
+)
+let $config := admin:database-add-range-element-index ($config, $db-id, $element-indexes)
+let $config := admin:database-add-range-element-attribute-index ($config, $db-id, $element-attribute-indexes)
+return admin:save-configuration ($config)</query><query name="mlcp" focus="false" listorder="4" taborder="4" active="true" database="2845277722470201063" server="6743820675239763446" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">(: run mlcp to import the zips 
+Fix the host, un/pw, and database
+Tricky part is to put things in the meters collection
+And db and host have to be set up first
+:)
+
+~/mlcp/mlcp-9.0.7/bin/mlcp.sh import -host 192.168.10.39 -port 8000 -username admin -password chamlin -mode local -input_file_path ./zips -database 22021-meters -input_compressed true -output_collections meters
+</query><query name="find data ranges" focus="false" listorder="5" taborder="5" active="true" database="13038961651590475269" server="6743820675239763446" database-name="01728156-odbc-sockets" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+(: 
+run this against the db you loaded to, and it shows date ranges for each period in the db (raw, hour, day)
+:)
+
+declare namespace meters = 'http://marklogic.com/manage/meters';
+for $period in ('raw', 'hour', 'day')
+let $query := cts:element-value-query (xs:QName ('meters:period'), $period)
+return
+$period||': '||
+fn:string-join ((
+fn:string (cts:values (cts:element-reference (xs:QName ('meters:start-time')), (), ('ascending', 'limit=1'), $query)),
+fn:string (cts:values (cts:element-reference (xs:QName ('meters:start-time')), (), ('descending', 'limit=1')))
+), ' -&gt; ')</query><query name="url for data period" focus="true" listorder="6" taborder="6" active="true" database="5323814262746911694" server="6743820675239763446" database-name="01711321-hang-restart" server-name="App-Services" mode="xquery" optimize="">declare namespace meters = 'http://marklogic.com/manage/meters';
+(: fix the hostname 
+you might need to hit the green refresh/reload after going to this url
+run this against the db you loaded to, and it shows a url to display date range covering the data loaded
+:)
+
+declare variable $hostname := 'localhost';
+
+declare function local:create-time-param ($dt as xs:dateTime) {
+ (
+ fn:replace (
+ fn:replace (
+ fn:string ($dt)
+ , 'T', ' ')
+ , ':\d\d$', '')
+ )
+};
+let $min := local:create-time-param (cts:values (cts:element-reference (xs:QName ('meters:start-time')), (), ('ascending', 'limit=1')) - xs:dayTimeDuration ('PT5M'))
+let $max := local:create-time-param (cts:values (cts:element-reference (xs:QName ('meters:start-time')), (), ('descending', 'limit=1')) + xs:dayTimeDuration ('PT5M'))
+return (
+    'This url should cover the meters data in the database.  You probably need to switch to raw and/or refresh (green arrow button)',
+    fn:concat ('http://', $hostname, ':8002/history/?start=', xdmp:url-encode ($min), '&amp;amp;end=', xdmp:url-encode ($max))
+)</query></workspace></export>
