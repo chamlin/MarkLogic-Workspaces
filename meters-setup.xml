@@ -79,7 +79,7 @@ $period||': '||
 fn:string-join ((
 fn:string (cts:values (cts:element-reference (xs:QName ('meters:start-time')), (), ('ascending', 'limit=1'), $query)),
 fn:string (cts:values (cts:element-reference (xs:QName ('meters:start-time')), (), ('descending', 'limit=1')))
-), ' -&gt; ')</query><query name="url for data period" focus="true" listorder="6" taborder="6" active="true" database="5323814262746911694" server="6743820675239763446" database-name="01711321-hang-restart" server-name="App-Services" mode="xquery" optimize="">declare namespace meters = 'http://marklogic.com/manage/meters';
+), ' -&gt; ')</query><query name="url for data period" focus="false" listorder="6" taborder="6" active="true" database="5323814262746911694" server="6743820675239763446" database-name="01711321-hang-restart" server-name="App-Services" mode="xquery" optimize="">declare namespace meters = 'http://marklogic.com/manage/meters';
 (: fix the hostname 
 you might need to hit the green refresh/reload after going to this url
 run this against the db you loaded to, and it shows a url to display date range covering the data loaded
@@ -101,4 +101,8 @@ let $max := local:create-time-param (cts:values (cts:element-reference (xs:QName
 return (
     'This url should cover the meters data in the database.  You probably need to switch to raw and/or refresh (green arrow button)',
     fn:concat ('http://', $hostname, ':8002/history/?start=', xdmp:url-encode ($min), '&amp;amp;end=', xdmp:url-encode ($max))
-)</query></workspace></export>
+)</query><query name="README" focus="true" listorder="1" taborder="1" active="true" database="5323814262746911694" server="6743820675239763446" database-name="01711321-hang-restart" server-name="App-Services" mode="xquery" optimize="1">(: workspace to set up another meters database :)
+
+fn:current-dateTime()
+
+(: 2025-05-07T20:50:24.453368Z :)</query></workspace></export>
