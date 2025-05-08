@@ -1,0 +1,329 @@
+<export><workspace name="dbs-forests"><query name="create" focus="false" listorder="1" taborder="1" active="true" database="2845277722470201063" server="6743820675239763446" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+import module namespace admin = "http://marklogic.com/xdmp/admin"
+		  at "/MarkLogic/admin.xqy";
+
+declare namespace f = 'http://marklogic.com/xdmp/status/forest';
+
+declare variable  $db-name := '01711321-hang-restart';
+
+declare variable  $number-of-forests := 1;
+declare variable  $test-only := fn:false();
+
+(: more options :)
+(: empty for internal :)
+declare variable  $data-dir := ();
+(: similar to db makes it easy to delete :)
+declare variable  $forest-prefix := $db-name || '-';
+declare variable  $schema-db-name := ();
+declare variable  $triggers-db-name := ();
+declare variable $security-db-name := 'Security';
+(: not implemented :)
+declare variable  $distribute-forests := fn:false(); 
+
+(: below here automatic :)
+
+
+declare variable $db-id := try { xdmp:database ($db-name) } catch ($e) { () };
+declare variable $step := if (fn:empty ($db-id)) then 'create' else 'attach';
+declare variable $save-config := fn:not ($test-only);
+declare variable $create-db := if ($step eq 'create') then fn:true() else fn:false();
+declare variable $create-forests := if ($step eq 'create') then fn:true() else fn:false();
+(: if next is true, creates should be false :)
+declare variable $attach-forests := if ($step eq 'create') then fn:false() else fn:true();
+declare variable $schema-db-id := if ($schema-db-name) then xdmp:database ($schema-db-name) else ();
+      
+declare function local:forest-names ($prefix, $num as xs:integer) {
+    for $i in 1 to $num
+    return fn:string-join (($prefix, fn:string ($i)), 'f')
+};
+
+
+let $forest-names := local:forest-names ($forest-prefix, $number-of-forests)
+let $config := admin:get-configuration()
+let $results := map:map()
+let $_create_db :=
+    if ($create-db) then (
+        xdmp:set ($config, admin:database-create($config, $db-name, xdmp:database ($security-db-name), $schema-db-id)),
+        map:put ($results, 'done', (map:get ($results, 'done'),
+            fn:concat ('Created db (', $db-name, ') with security (', $security-db-name, ') and schema (', $schema-db-name, ').')
+        ))
+    ) else ()
+let $_create_forests := 
+    if ($create-forests) then
+        for $forest-name in $forest-names
+        let $host := xdmp:host ()
+        return (
+            xdmp:set ($config, admin:forest-create ($config, $forest-name, $host, $data-dir)),
+            map:put ($results, 'done', (map:get ($results, 'done'),
+                fn:concat ('Created forest (', $forest-name, ') on host (', xdmp:host-name ($host) ,') at data-dir (', $data-dir ,'), run again to attach.')
+            ))
+        )
+    else ()
+let $_attach_forests := 
+    if ($attach-forests) then (
+        let $db-id := xdmp:database ($db-name)
+        for $forest-name in $forest-names 
+        let $fid := xdmp:forest ($forest-name)
+        where fn:empty (xdmp:forest-status ($fid)/f:database-id)
+        return (
+            xdmp:set ($config, admin:database-attach-forest ($config, $db-id, $fid)),
+            map:put ($results, 'done', (map:get ($results, 'done'),
+                fn:concat ('Attached forest ', $forest-name, ' to db ', $db-name, '.')
+            ))
+        ),
+        (: also need to attache triggers db :)
+        if ($triggers-db-name and (admin:database-get-triggers-database ($config, $db-id) ne xdmp:database ($triggers-db-name))) then (
+            xdmp:set ($config, admin:database-set-triggers-database ($config, xdmp:database ($db-name), xdmp:database ($triggers-db-name))),
+            map:put ($results, 'done', (map:get ($results, 'done'),
+                fn:concat ('Attached triggers db ', $triggers-db-name, ' to db ', $db-name, '.')
+            ))
+        ) else ()
+    )
+    else ()
+return (
+    if ($test-only) then 'Test run only, no changes saved.' else ()
+    ,
+    let $done := map:get ($results, 'done')
+    return if ($done) then $done else 'No work to be done.'
+    ,
+    if ($save-config) then admin:save-configuration($config)
+    else                   $config
+)</query><query name="remove" focus="false" listorder="2" taborder="2" active="true" database="3075624733771747731" server="6743820675239763446" database-name="" server-name="" mode="xquery" optimize="">xquery version "1.0-ml";
+import module namespace admin = "http://marklogic.com/xdmp/admin"
+		  at "/MarkLogic/admin.xqy";
+      
+declare namespace f = 'http://marklogic.com/xdmp/status/forest';
+
+let $db-name := 'default'
+
+(: if created by this ws prefix should match, only deletes unassigned forests too :)
+let $forest-prefix := $db-name || '-'
+
+
+
+(: below here automatic :)
+
+let $config := admin:get-configuration()
+let $database := try { xdmp:database ($db-name) } catch ($e) { () }
+let $update := 
+    let $forest-ids := 
+        for $fid in xdmp:forests ()
+        where fn:starts-with (xdmp:forest-name ($fid), $forest-prefix) and fn:empty (xdmp:forest-status ($fid)/f:database-id)
+        return $fid
+    return
+        if ($database) then (
+            xdmp:set ($config, admin:database-delete($config, admin:database-get-id($config, $db-name))),
+            'Deleting db "'|| $db-name ||'", run again to remove any forests with prefix "' || $forest-prefix || '".'
+        ) else if ($forest-ids) then (
+            xdmp:set ($config, admin:forest-delete($config, $forest-ids, fn:true())),
+            'Deleting forests: ' || fn:string-join (($forest-ids ! xdmp:forest-name (.)), ', ') || '.'
+        ) else 'No work to do.'
+return (
+    $update,
+    admin:save-configuration ($config)
+)</query><query name="file test" focus="true" listorder="4" taborder="4" active="true" database="2845277722470201063" server="6743820675239763446" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+
+import module namespace admin = "http://marklogic.com/xdmp/admin" at "/MarkLogic/admin.xqy";
+      
+declare namespace f = 'http://marklogic.com/xdmp/status/forest';
+declare namespace db = 'http://marklogic.com/xdmp/database';
+
+declare variable $percents := '%%%%%%%%%%%%%%%%%%%%%%%';
+declare variable $equals-line := '===========================================================================[\r\n]*';
+
+declare function local:databases-from-dump ($path as xs:string) {
+try {
+    let $text := xdmp:document-get ($path, map:entry ('format', 'text'))
+    let $db-string := 
+        if (fn:starts-with ($text, $percents)) then
+            xdmp:unquote ((fn:tokenize ($text, $equals-line)[fn:starts-with (., '&lt;database')])[1])
+        else
+            (xdmp:unquote ('&lt;foo&gt;'||$text||'&lt;/foo&gt;')/foo/db:databases)[1]            
+    return 'ok'
+} catch ($e) {
+    'Cannot extract ' || $path || ': ' || $e//*:format-string/fn:string()
+}
+};
+
+let $base-path := '/Users/chamlin/test-dumps'
+let $dir := xdmp:filesystem-directory($base-path)
+let $file-paths := $dir/dir:entry[dir:type eq 'file']/dir:pathname/fn:data()[fn:not (fn:ends-with (., '.DS_Store'))]
+for $file-path in $file-paths
+return local:databases-from-dump ($file-path)
+</query><query name="scramble forests" focus="false" listorder="5" taborder="5" active="true" database="2845277722470201063" server="6743820675239763446" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+
+import module namespace admin = "http://marklogic.com/xdmp/admin" at "/MarkLogic/admin.xqy"; 
+
+declare variable $db-name := 'junk';
+
+declare function local:scramble ($items) {
+    let $count := fn:count ($items)
+    return
+        if ($count = 1) then
+            $items
+        else
+            let $selection-index := xdmp:random ($count - 1) + 1
+            let $remaining := (fn:subsequence ($items, 1, $selection-index - 1), fn:subsequence ($items, $selection-index + 1))
+            return (fn:subsequence ($items, $selection-index, 1), local:scramble ($remaining))
+
+};
+
+
+let $config := admin:get-configuration()
+let $db-id := admin:database-get-id ($config, $db-name)
+let $forest-ids := admin:database-get-attached-forests ($config, $db-id)
+return admin:save-configuration (admin:database-reorder-forests ($config, $db-id, local:scramble ($forest-ids)))</query><query name="clone config" focus="false" listorder="3" taborder="3" active="true" database="2845277722470201063" server="6743820675239763446" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+
+import module namespace admin = "http://marklogic.com/xdmp/admin" at "/MarkLogic/admin.xqy";
+      
+declare namespace f = 'http://marklogic.com/xdmp/status/forest';
+declare namespace db = 'http://marklogic.com/xdmp/database';
+declare variable $percents := '%%%%%%%%%%%%%%%%%%%%%%%';
+declare variable $equals-line := '===========================================================================[\r\n]*';
+
+(:  ================   :)
+(: in here, the stuff to set most usually :)
+declare variable $source-file-path1 := '/home/chamlin/mac/test-dumps/20180624-dr-dupport-dmp.txt';
+declare variable $source-file-path2 := '/Users/chamlin/tickets/32151-cjk-matches/2021-10-05/cortland.txt';
+declare variable $source-file-path3 := '/Users/chamlin/tmp/ml-conf/databases.xml';
+declare variable $source-file-path := '/Users/chamlin/tickets/34505-jp-search/Support-Dump/Historical/virpinhsrch1n10_dsv_prod_pib_dowjones_io/Configuration/databases.xml';
+
+declare variable $old-db-name := 'full-db';
+declare variable $current-db-name := 'full-db';
+(: dir to save the old/new configs for inspection.  empty string for no writes.  no trailing slash :)
+declare variable $write-db-configs := '/Users/chamlin/tmp';
+(: should we actually write the new cluster config file? :)
+declare variable $configure-db-now := fn:true();
+(:  ================   :)
+
+declare variable $elements-kept := ('database-name', 'database-id', 'forests', 'security-database', 'schema-database', 'triggers-database', 'enabled', 'retired-forest-count');
+(: stuff to replace with empty versions. :)
+declare variable $element-empties := ('database-replication', 'database-references');
+
+declare function local:is-dump-file ($path as xs:string) {
+    let $text := xdmp:document-get ($path, map:entry ('format', 'text'))
+    return fn:starts-with($text, $percents)
+};
+
+declare function local:is-databases-file ($path as xs:string) {
+    let $text := xdmp:document-get ($path, map:entry ('format', 'text'))
+    return fn:starts-with($text, '&lt;databases')
+};
+
+declare function local:database-config-from-file ($path as xs:string, $db-name as xs:string) {
+    let $text := xdmp:document-get ($path, map:entry ('format', 'text'))
+    return
+        if (fn:starts-with($text, $percents)) then
+            local:database-from-dump ($path, $db-name) 
+        else if (fn:starts-with($text, '&lt;databases')) then
+            local:database-from-databases-xml ($path, $db-name)
+        else if (fn:starts-with($text, '&lt;?xml')) then
+            local:database-from-databases-xml ($path, $db-name)
+        else ('unknown')
+};
+
+declare function local:database-from-dump ($path as xs:string, $db-name as xs:string) {
+try {
+let $_trace := xdmp:trace ('db-clone', 'getting db '||$db-name||' from dump '||$path||'.')
+    let $text := xdmp:document-get ($path, map:entry ('format', 'text'))
+    let $databases-element := 
+        if (fn:starts-with ($text, $percents)) then
+            xdmp:unquote ((fn:tokenize ($text, $equals-line)[fn:starts-with (., '&lt;databases')]))
+        else
+            (xdmp:unquote ('&lt;foo&gt;'||$text||'&lt;/foo&gt;')/foo/db:databases)[1]    
+    return ($databases-element/db:databases/db:database[db:database-name eq $db-name])[1]
+} catch ($e) {
+    'Cannot extract ' || $path || ': ' || $e//*:format-string/fn:string()
+}
+};
+
+declare function local:database-from-databases-xml ($path as xs:string, $db-name as xs:string) {
+try {
+    let $_trace := xdmp:trace ('db-clone', 'getting db '||$db-name||' from xml '||$path||'.')
+    let $databases-doc := xdmp:document-get ($path, map:entry ('format', 'xml'))
+    return $databases-doc/db:databases/db:database[db:database-name eq $old-db-name]
+} catch ($e) {
+    'Cannot extract ' || $path || ': ' || $e//*:format-string/fn:string()
+}
+};
+
+declare function local:current-database-config ($db-name) {
+    let $databases := xdmp:read-cluster-config-file ('databases.xml')
+    let $target-db-element := xdmp:read-cluster-config-file ('databases.xml')/db:databases/db:database[db:database-name eq $db-name]
+    return $target-db-element
+};
+
+declare function local:create-new-config ($source-db-config, $target-db-config) {
+    (: get source-file, get settings for source-file/source-db, get databases.xml, splice in, write-cluster-config-file :)
+    let $elements-kept := ('database-name', 'database-id', 'forests', 'security-database', 'schema-database', 'triggers-database', 'enabled', 'retired-forest-count')
+    let $new-config :=
+        &lt;database  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://marklogic.com/xdmp/database"&gt;{
+            for $target-element in $target-db-config/*
+            let $element-name := fn:local-name ($target-element)
+            let $source-element := $source-db-config/db:*[fn:local-name (.) = $element-name]            
+            let $_trace := xdmp:trace ('db-clone:create', 'source-element count: '||fn:count($source-element))
+            let $_trace := xdmp:trace ('db-clone:create', 'target-element dump: '||xdmp:describe ($target-element))            
+            let $_trace := xdmp:trace ('db-clone:create', 'element-name: '||$element-name)
+            let $_trace := xdmp:trace ('db-clone:create', 'source-element count: '||fn:count($source-element))
+            let $_trace := xdmp:trace ('db-clone:create', 'source-element dump: '||xdmp:describe ($source-element))
+            return
+                if (fn:not (fn:exists ($source-element)) or $element-name = $elements-kept) then (: no source, or to be retained from target, just keep it :)
+                    $target-element
+                else if ($element-name = $element-empties) then
+                    element { xs:QName ($element-name) } {}                    
+                else 
+                    $source-element
+        }&lt;/database&gt;
+    return $new-config
+};
+
+declare function local:create-new-databases-file ($new-db-config) {
+    let $databases := xdmp:read-cluster-config-file ('databases.xml')
+    let $writes := 
+         if (fn:string-length ($write-db-configs) &gt; 0) then xdmp:save ($write-db-configs||'/'||$current-db-name||'-old-databases.xml', $databases) else ()
+    let $db-name := $new-db-config/db:database-name/fn:string()
+    let $new-databases :=
+        &lt;databases xsi:schemaLocation="http://marklogic.com/xdmp/database database.xsd" xml:lang="zxx" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://marklogic.com/xdmp/database"&gt;{
+            for $element in $databases/db:databases/*
+            return 
+                if ($element/self::element(db:database) and $element/db:database-name/fn:string() eq $db-name) then (
+                    $new-db-config,
+                    xdmp:trace ('db-clone:replace', 'replacing db: '||$element/db:database-name/fn:string())
+                ) else 
+                    $element
+        }&lt;/databases&gt;
+    return $new-databases
+};
+
+let $old-db-config := local:database-config-from-file ($source-file-path, $old-db-name)
+let $current-db-config := local:current-database-config ($current-db-name)
+let $new-db-config := local:create-new-config ($old-db-config, $current-db-config)
+let $new-databases := local:create-new-databases-file ($new-db-config)
+let $writes := 
+     if (fn:string-length ($write-db-configs) &gt; 0) then (        
+         xdmp:save ($write-db-configs||'/'||$old-db-name||'-old-config.xml', $old-db-config),
+         xdmp:save ($write-db-configs||'/'||$current-db-name||'-current-config.xml', $current-db-config),
+         xdmp:save ($write-db-configs||'/'||$current-db-name||'-new-config.xml', $new-db-config),
+         xdmp:save ($write-db-configs||'/'||$current-db-name||'-new-databases.xml', $new-databases),
+         xdmp:save ($write-db-configs||'/'||$current-db-name||'-old-databases.xml', xdmp:read-cluster-config-file ('databases.xml'))
+     ) else ()
+return (
+   if ($configure-db-now) then xdmp:write-cluster-config-file ('databases.xml', $new-databases, 5) else ()
+)
+
+</query><query name="copy db" focus="false" listorder="6" taborder="6" active="true" database="2845277722470201063" server="6743820675239763446" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+(: do this copy :)
+import module namespace admin = "http://marklogic.com/xdmp/admin"
+    at "/MarkLogic/admin.xqy";
+
+let $config := admin:get-configuration()
+return
+admin:save-configuration (admin:database-copy($config, xdmp:database("junk"), "junk2"))</query><query name="db create" focus="false" listorder="7" taborder="7" active="true" database="2845277722470201063" server="6743820675239763446" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+
+import module namespace admin = "http://marklogic.com/xdmp/admin"
+      at "/MarkLogic/admin.xqy";
+
+let $config := admin:get-configuration()
+let $config := admin:database-create($config, "mytestdb", xdmp:database("Security"), xdmp:database("Schemas"))
+return admin:save-configuration ($config)
+</query></workspace></export>
