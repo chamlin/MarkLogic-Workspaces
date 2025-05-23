@@ -1,0 +1,51 @@
+<export><workspace name="dumpcheck"><query name="header" focus="false" listorder="1" taborder="1" active="true" database="2845277722470201063" server="6743820675239763446" database-name="Documents" server-name="App-Services" mode="xquery" optimize="1">xquery version "1.0-ml";
+
+declare namespace db = 'http://marklogic.com/xdmp/database';
+declare namespace fs = 'http://marklogic.com/xdmp/status/forest';
+declare namespace ks = 'http://marklogic.com/xdmp/status/keystore';
+
+import module namespace op="http://marklogic.com/optic"
+     at "/MarkLogic/optic.xqy";</query><query name="encryption" focus="true" listorder="2" taborder="2" active="true" database="2845277722470201063" server="6743820675239763446" database-name="Documents" server-name="App-Services" mode="xquery" optimize="1">xquery version "1.0-ml";
+
+declare namespace db = 'http://marklogic.com/xdmp/database';
+declare namespace fs = 'http://marklogic.com/xdmp/status/forest';
+declare namespace ks = 'http://marklogic.com/xdmp/status/keystore';
+
+import module namespace op="http://marklogic.com/optic"
+     at "/MarkLogic/optic.xqy";
+
+let $rows := (
+    map:new ((
+        map:entry ('location', '&gt;&gt; CONFIGURATION'), map:entry ('setting', ''), map:entry ('value', '')
+    ))
+,
+    for $ks in (/ks:keystore-status)[1]
+    return (
+        map:new ((
+            map:entry ('location', 'keystore.xml'), map:entry ('setting', 'data-encryption'), map:entry ('value', $ks/ks:data-encryption/fn:string())
+        )),
+        map:new ((
+            map:entry ('location', 'keystore.xml'), map:entry ('setting', 'logs-encryption'), map:entry ('value', $ks/ks:logs-encryption/fn:string())
+        ))
+    )
+,
+    for $db in (/db:databases)[1]/db:database
+    return map:new ((
+            map:entry ('location', $db/db:database-name/fn:string()),
+            map:entry ('setting', 'db:data-encryption'),
+            map:entry ('value', $db/db:data-encryption/fn:string())
+    ))
+,
+    map:new ((
+        map:entry ('location', '&gt;&gt; FOREST STATUS'), map:entry ('setting', ''), map:entry ('value', '')
+    ))
+,
+    for $fs in (/fs:forest-status)
+    return map:new ((
+            map:entry ('location', $fs/fs:forest-name/fn:string()),
+            map:entry ('setting', 'fs:encryption'),
+            map:entry ('value', $fs/fs:encryption/fn:string())
+    ))
+)
+
+return op:from-literals ($rows) =&gt; op:select(("location", "setting", "value")) =&gt; op:result()</query></workspace></export>
