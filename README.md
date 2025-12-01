@@ -12,9 +12,17 @@ Just back away slowly, haha.
 
 create, delete, clone dbs
 
+## meters-explorer.xml
+
+look at some stuff that the history doesn't show
+
 ## meters-setup.xml
 
 set up server/db for meters extract use
+
+## db-rep.xml
+
+add/remove db rep via xqy in QC
 
 ## tokens-stems.xml
 
