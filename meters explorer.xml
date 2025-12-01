@@ -1,0 +1,134 @@
+<export><workspace name="meters explorer"><query name="meters data coverage" focus="false" listorder="1" taborder="1" active="true" database="3852964746460187282" server="5027337739158958633" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+declare namespace meters = 'http://marklogic.com/manage/meters';
+let $id-names := ('cluster-id', 'group-id', 'host-id', 'database-id', 'forest-id', 'server-id')
+let $id-map := map:map()
+let $_load-map :=
+    for $id in $id-names
+    return map:put ($id-map, $id, cts:values (cts:element-reference (xs:QName ('meters:'||$id), 'type=unsignedLong')))
+return
+    for $id-name in $id-names
+    order by $id-name
+    return $id-name || ': ' || fn:string-join (map:get ($id-map, $id-name) ! fn:string(.), ', ')
+;
+declare namespace meters = 'http://marklogic.com/manage/meters';
+let $id-names := ('period', 'name')
+let $id-map := map:map()
+let $_load-map :=
+    for $id in $id-names
+    return map:put ($id-map, $id, cts:values (cts:element-reference (xs:QName ('meters:'||$id), 'type=string')))
+return
+    for $id-name in $id-names
+    order by $id-name
+    return $id-name || ': ' || fn:string-join (map:get ($id-map, $id-name) ! fn:string(.), ', ')
+
+
+</query><query name="junk" focus="false" listorder="2" taborder="2" active="true" database="3852964746460187282" server="5027337739158958633" database-name="Documents" server-name="App-Services" mode="xquery" optimize="">xquery version "1.0-ml";
+declare namespace meters = 'http://marklogic.com/manage/meters';
+let $id-names := ('cluster-id', 'group-id', 'host-id', 'database-id', 'forest-id', 'server-id')
+let $id-map := map:map()
+let $_load-map :=
+    for $id in $id-names
+    return map:put ($id-map, $id, cts:values (cts:element-reference (xs:QName ('meters:'||$id), 'type=unsignedLong')))
+return
+    for $id-name in $id-names
+    order by $id-name
+    return $id-name || ': ' || fn:string-join (map:get ($id-map, $id-name) ! fn:string(.), ', ')
+;
+declare namespace meters = 'http://marklogic.com/manage/meters';
+let $id-names := ('period', 'name')
+let $id-map := map:map()
+let $_load-map :=
+    for $id in $id-names
+    return map:put ($id-map, $id, cts:values (cts:element-reference (xs:QName ('meters:'||$id), 'type=string')))
+return
+    for $id-name in $id-names
+    order by $id-name
+    return $id-name || ': ' || fn:string-join (map:get ($id-map, $id-name) ! fn:string(.), ', ')
+
+
+</query><query name="Query 5" focus="false" listorder="3" taborder="3" active="true" database="16772151665065755759" server="5027337739158958633" database-name="01760825-broadridge" server-name="App-Services" mode="xquery" optimize="">module namespace impl = "http://marklogic.com/manage/meters/impl";
+
+import module namespace mdecl="http://marklogic.com/manage/meters/decl"
+    at "/MarkLogic/manage/meter/meter-decl.xqy";
+
+import module namespace u="http://marklogic.com/manage/meters/utils"
+    at "/MarkLogic/manage/meter/meter-utils.xqy";
+
+import module namespace hof="http://marklogic.com/higher-order"
+    at "/MarkLogic/appservices/utils/higher-order.xqy";
+
+import module namespace model = "http://marklogic.com/manage/meters/ts-model"
+   at "/MarkLogic/manage/models/time-series-model.xqy";
+
+import module namespace tr-model = "http://marklogic.com/manage/meters/transient-resource/model"
+   at "/MarkLogic/manage/models/transient-resource-model.xqy";
+
+import module namespace mout = "http://marklogic.com/manage/lib/model-util"
+   at "/MarkLogic/manage/lib/model-util.xqy";
+
+declare namespace meter="http://marklogic.com/manage/meters";
+
+model:getForestTimeSeries(
+                    $format,$metrics,$period,$start,$end,
+                    $summary,$detail,$aggregation,$forests,$tr-fs,
+                    $cluster-id ! xs:unsignedLong(.),
+                    $host-id ! xs:unsignedLong(.),
+                    $collection)</query><query name="threads/queue" focus="false" listorder="4" taborder="4" active="true" database="12283477465488565638" server="5027337739158958633" database-name="" server-name="" mode="xquery" optimize="">xquery version "1.0-ml";
+
+import module namespace op="http://marklogic.com/optic"
+     at "/MarkLogic/optic.xqy";
+     
+declare namespace m = 'http://marklogic.com/manage/meters';
+
+let $period := 'raw'
+let $period-query := cts:element-range-query (xs:QName ('m:period'), '=', $period)
+let $start-date-time := xs:dateTime ('2025-03-05T11:00:00Z')
+let $end-date-time := xs:dateTime ('2025-03-05T11:01:00Z')
+let $date-time-query := cts:and-query ((
+    cts:element-range-query (xs:QName ('m:period-start-time'), '&gt;=', $start-date-time),
+    cts:element-range-query (xs:QName ('m:period-start-time'), '&lt;=', $end-date-time)
+))
+
+let $result := 
+op:from-literals ((
+for $sss in cts:search (/m:server-statuses, cts:and-query (($period-query, $date-time-query)))
+for $ss in $sss/m:server-status
+return map:entry ('timestamp', $ss/m:start-time/fn:data())=&gt;map:with ('queue', $ss/m:queue-size/fn:data())=&gt;map:with ('threads', $ss/m:threads/fn:data())
+          =&gt; map:with ('server-name', $ss/m:server-name/fn:string())
+          =&gt; map:with ('host-name', $ss/../m:host-name/fn:string())
+)) =&gt; op:select (('timestamp', 'host-name', 'server-name', 'threads', 'queue')) =&gt; op:order-by (op:asc ('timestamp')) =&gt; op:result()
+
+return $result</query><query name="server/node request rates" focus="true" listorder="5" taborder="5" active="true" database="12764016667214322219" server="5027337739158958633" database-name="01738282-loc" server-name="App-Services" mode="xquery" optimize="1">xquery version "1.0-ml";
+
+declare namespace ss = 'http://marklogic.com/manage/meters';
+import module namespace op = 'http://marklogic.com/optic' at '/MarkLogic/optic.xqy';
+
+declare variable $period := 'hour';
+
+declare function local:get-statuses-rows ($ss) {
+    for $s in $ss/ss:server-status
+    let $date-time := $ss/ss:period-start-time/fn:string()
+    let $hostname := $ss/ss:host-name/fn:string()
+    let $server-name := $s/ss:server-name/fn:string()
+    let $request-rate := $s/ss:request-rate/fn:string()
+
+    return map:new ((
+        map:entry ('date-time', $date-time),
+        map:entry ('server-name', $server-name),
+        map:entry ('hostname', $hostname),
+        map:entry ('request-rate', $request-rate)
+    ))
+};
+
+let $rows := ()
+
+let $_ :=
+    for $ss in (/ss:server-statuses)
+    let $dt := $ss/ss:period-start-time/fn:string()
+    return xdmp:set ($rows, ($rows, local:get-statuses-rows ($ss)))
+
+return op:from-literals(($rows))
+        =&gt; op:order-by (('server-name', 'date-time', 'hostname'))
+        =&gt; op:select (('date-time', 'server-name', 'hostname', 'request-rate'))
+        =&gt; op:result()
+</query></workspace></export>
