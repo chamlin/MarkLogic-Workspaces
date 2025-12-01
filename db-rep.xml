@@ -1,0 +1,55 @@
+<export><workspace name="db rep xqy"><query name="set foreign replica" focus="true" listorder="1" taborder="1" active="true" database="4576069410876198341" server="11706785748932316715" database-name="Security" server-name="Admin" mode="xquery">  xquery version "1.0-ml";
+
+  import module namespace admin = "http://marklogic.com/xdmp/admin"
+      at "/MarkLogic/admin.xqy";
+
+  let $fdb := xs:unsignedLong(5468852672189657520)
+  let $cfg := admin:get-configuration()
+  let $fcl := admin:cluster-get-foreign-cluster-id($cfg, "c2-cluster")
+  let $foreign-replica := admin:database-foreign-replica($fcl, $fdb, fn:true(), 300)
+  return  admin:save-configuration (admin:database-set-foreign-replicas ($cfg, xdmp:database ('Security'), $foreign-replica))
+
+
+  (: Returns the replica database configuration. Use the
+  admin:database-set-foreign-replicas function to set the configuration. 
+    return admin:save-configuration (admin:database-set-foreign-replicas ($cfg, xdmp:database ('Security'), $foreign-replica))
+
+  
+    return admin:database-foreign-replica($fcl, $fdb, fn:true(), 300)
+
+
+:)</query><query name="set foreign master" focus="false" listorder="2" taborder="2" active="true" database="4576069410876198341" server="11706785748932316715" database-name="Security" server-name="Admin" mode="xquery">  xquery version "1.0-ml";
+
+  import module namespace admin = "http://marklogic.com/xdmp/admin"
+      at "/MarkLogic/admin.xqy";
+
+  let $fdb := 4576069410876198341
+  let $cfg := admin:get-configuration()
+  let $fcl := admin:cluster-get-foreign-cluster-id($cfg, "c1-cluster")
+  let $fmaster := admin:database-foreign-master($fcl, $fdb, fn:true())
+
+  return admin:save-configuration (admin:database-set-foreign-master(
+                $cfg,
+                xdmp:database("Security"),
+                $fmaster))</query><query name="remove foreign replica" focus="false" listorder="3" taborder="3" active="true" database="4576069410876198341" server="11706785748932316715" database-name="Security" server-name="Admin" mode="xquery">  xquery version "1.0-ml";
+
+  import module namespace admin = "http://marklogic.com/xdmp/admin"
+      at "/MarkLogic/admin.xqy";
+
+  let $cfg := admin:get-configuration()
+  let $freplica := admin:database-get-foreign-replicas($cfg, xdmp:database("Security"))
+
+  return admin:save-configuration (admin:database-delete-foreign-replicas($cfg, xdmp:database("Security"), $freplica))
+  
+  </query><query name="remove foreign master" focus="false" listorder="4" taborder="4" active="true" database="4576069410876198341" server="11706785748932316715" database-name="Security" server-name="Admin" mode="xquery">  xquery version "1.0-ml";
+
+  import module namespace admin = "http://marklogic.com/xdmp/admin"
+      at "/MarkLogic/admin.xqy";
+
+  let $cfg := admin:get-configuration()
+
+  return admin:save-configuraton (admin:database-delete-foreign-master($cfg, xdmp:database("Security")))
+
+  (: Returns a configuration element with the foreign master database, 'Documents',
+     removed.  Use admin:save-configuration to save the changes to the configuration
+     or pass the configuration to other Admin API functions to make other changes. :)</query></workspace></export>
